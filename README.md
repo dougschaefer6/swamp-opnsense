@@ -46,7 +46,7 @@ swamp vault put opnsense api-secret="YOUR_API_SECRET" -f
 swamp model create @dougschaefer/opnsense-firewall my-firewall \
   --global-arg 'apiKey=${{ vault.get(opnsense, api-key) }}' \
   --global-arg 'apiSecret=${{ vault.get(opnsense, api-secret) }}' \
-  --global-arg 'baseUrl=https://192.168.1.1'
+  --global-arg 'baseUrl=https://YOUR_OPNSENSE_IP'
 ```
 
 ### 4. Run methods
@@ -62,7 +62,7 @@ swamp model method run my-firewall tunables --json
 
 Tested against OPNsense 26.1.2 on FreeBSD 14. Key API notes:
 
-- Uses `curl` subprocess for HTTPS requests to handle self-signed certificates (OPNsense default). Deno's native `fetch` cannot skip hostname verification when the cert is issued to a hostname (e.g., `OPNsense.internal`) but accessed by IP.
+- Uses `curl` subprocess for HTTPS requests to handle self-signed certificates (OPNsense default). Deno's native `fetch` cannot skip hostname verification when the cert is issued to a hostname but accessed by IP.
 - GET requests must not include a `Content-Type` header or OPNsense returns 400.
 - Tunables use `/api/core/tunables/*` endpoints and require the full `sysctl` object for `setItem`.
 
@@ -80,10 +80,6 @@ swamp model create @dougschaefer/opnsense-firewall client-a-fw1 \
   --global-arg 'apiSecret=${{ vault.get(client-a-opnsense, api-secret) }}' \
   --global-arg 'baseUrl=https://10.0.1.1'
 ```
-
-## Companion MCP Server
-
-For interactive AI-assisted firewall management, pair this extension with the [@richard-stovall/opnsense-mcp-server](https://github.com/Pixelworlds/opnsense-mcp-server) (24 core tools, full OPNsense API coverage). The MCP server handles ad-hoc queries; the swamp extension handles structured automation and state tracking.
 
 ## License
 
