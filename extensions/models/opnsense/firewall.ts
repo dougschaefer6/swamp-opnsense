@@ -1,5 +1,9 @@
 import { z } from "npm:zod@4";
-import { opnsenseApi, OPNsenseGlobalArgsSchema, sanitizeId } from "./_client.ts";
+import {
+  opnsenseApi,
+  OPNsenseGlobalArgsSchema,
+  sanitizeId,
+} from "./_client.ts";
 
 export const model = {
   type: "@dougschaefer/opnsense-firewall",
@@ -7,7 +11,8 @@ export const model = {
   globalArguments: OPNsenseGlobalArgsSchema,
   resources: {
     status: {
-      description: "OPNsense system status: firmware, CPU, memory, uptime, gateway health",
+      description:
+        "OPNsense system status: firmware, CPU, memory, uptime, gateway health",
       schema: z.object({
         hostname: z.string(),
         firmware: z.string(),
@@ -32,7 +37,8 @@ export const model = {
       garbageCollection: 5,
     },
     interface: {
-      description: "Network interface with traffic stats, MTU, link state, and hardware offloads",
+      description:
+        "Network interface with traffic stats, MTU, link state, and hardware offloads",
       schema: z.object({
         name: z.string(),
         device: z.string(),
@@ -89,10 +95,18 @@ export const model = {
         const g = context.globalArgs;
 
         const [firmware, gateways, activity, pfStates] = await Promise.all([
-          opnsenseApi("/core/firmware/status", g) as Promise<Record<string, unknown>>,
-          opnsenseApi("/routes/gateway/status", g) as Promise<Record<string, unknown>>,
-          opnsenseApi("/diagnostics/activity/getActivity", g) as Promise<Record<string, unknown>>,
-          opnsenseApi("/diagnostics/firewall/pf_states/0/1", g) as Promise<Record<string, unknown>>,
+          opnsenseApi("/core/firmware/status", g) as Promise<
+            Record<string, unknown>
+          >,
+          opnsenseApi("/routes/gateway/status", g) as Promise<
+            Record<string, unknown>
+          >,
+          opnsenseApi("/diagnostics/activity/getActivity", g) as Promise<
+            Record<string, unknown>
+          >,
+          opnsenseApi("/diagnostics/firewall/pf_states/0/1", g) as Promise<
+            Record<string, unknown>
+          >,
         ]);
 
         const product = firmware.product as Record<string, string> ?? {};
@@ -101,11 +115,13 @@ export const model = {
         const cpuLine = headers.find((h: string) => h.includes("CPU:")) ?? "";
         const memLine = headers.find((h: string) => h.includes("Mem:")) ?? "";
         const swapLine = headers.find((h: string) => h.includes("Swap:")) ?? "";
-        const uptimeLine = headers.find((h: string) => h.includes("load averages")) ?? "";
+        const uptimeLine =
+          headers.find((h: string) => h.includes("load averages")) ?? "";
 
         const loadMatch = uptimeLine.match(/load averages:\s+([\d.,\s]+)/);
         const uptimeMatch = uptimeLine.match(/up\s+([\d+:]+)/);
-        const memActive = memLine.match(/([\d.]+\w+)\s+Active/)?.[1] ?? "unknown";
+        const memActive = memLine.match(/([\d.]+\w+)\s+Active/)?.[1] ??
+          "unknown";
         const memFree = memLine.match(/([\d.]+\w+)\s+Free/)?.[1] ?? "unknown";
         const gwItems = (gateways.items as Array<Record<string, string>>) ?? [];
 
@@ -140,7 +156,11 @@ export const model = {
           },
         );
 
-        const handle = await context.writeResource("status", "system", statusData);
+        const handle = await context.writeResource(
+          "status",
+          "system",
+          statusData,
+        );
         return { dataHandles: [handle] };
       },
     },
@@ -153,17 +173,27 @@ export const model = {
         const g = context.globalArgs;
 
         const [overview, stats] = await Promise.all([
-          opnsenseApi("/interfaces/overview/export", g) as Promise<Array<Record<string, unknown>>>,
-          opnsenseApi("/diagnostics/traffic/interface", g) as Promise<Record<string, unknown>>,
+          opnsenseApi("/interfaces/overview/export", g) as Promise<
+            Array<Record<string, unknown>>
+          >,
+          opnsenseApi("/diagnostics/traffic/interface", g) as Promise<
+            Record<string, unknown>
+          >,
         ]);
 
-        const statsInterfaces = (stats.interfaces ?? {}) as Record<string, Record<string, unknown>>;
+        const statsInterfaces = (stats.interfaces ?? {}) as Record<
+          string,
+          Record<string, unknown>
+        >;
         const handles = [];
 
         for (const iface of overview) {
-          const ifName = (iface.description ?? iface.identifier ?? "unknown") as string;
-          const device = (iface.device ?? iface.identifier ?? "unknown") as string;
-          const ifStats = statsInterfaces[device.toLowerCase()] ?? statsInterfaces[ifName.toLowerCase()] ?? {};
+          const ifName =
+            (iface.description ?? iface.identifier ?? "unknown") as string;
+          const device =
+            (iface.device ?? iface.identifier ?? "unknown") as string;
+          const ifStats = statsInterfaces[device.toLowerCase()] ??
+            statsInterfaces[ifName.toLowerCase()] ?? {};
 
           const data = {
             name: ifName,
@@ -183,15 +213,22 @@ export const model = {
             collisions: Number(ifStats.collisions ?? 0),
           };
 
-          context.logger.info("Interface {name} ({device}): {rx} rx / {tx} tx bytes", {
-            name: ifName,
-            device,
-            rx: data.bytesReceived,
-            tx: data.bytesSent,
-          });
+          context.logger.info(
+            "Interface {name} ({device}): {rx} rx / {tx} tx bytes",
+            {
+              name: ifName,
+              device,
+              rx: data.bytesReceived,
+              tx: data.bytesSent,
+            },
+          );
 
           const uniqueKey = sanitizeId(`${ifName}-${device}`);
-          const handle = await context.writeResource("interface", uniqueKey, data);
+          const handle = await context.writeResource(
+            "interface",
+            uniqueKey,
+            data,
+          );
           handles.push(handle);
         }
 
@@ -205,8 +242,14 @@ export const model = {
       arguments: z.object({}),
       execute: async (_args, context) => {
         const g = context.globalArgs;
-        const result = await opnsenseApi("/unbound/diagnostics/stats", g) as Record<string, unknown>;
-        const data = result.data as Record<string, Record<string, Record<string, string>>>;
+        const result = await opnsenseApi(
+          "/unbound/diagnostics/stats",
+          g,
+        ) as Record<string, unknown>;
+        const data = result.data as Record<
+          string,
+          Record<string, Record<string, string>>
+        >;
 
         let totalQueries = 0;
         let cacheHits = 0;
@@ -227,7 +270,9 @@ export const model = {
           discardedTimeout += Number(num["queries_discard_timeout"] ?? 0);
         }
 
-        const hitRate = totalQueries > 0 ? Math.round((cacheHits / totalQueries) * 10000) / 100 : 0;
+        const hitRate = totalQueries > 0
+          ? Math.round((cacheHits / totalQueries) * 10000) / 100
+          : 0;
 
         const dnsData = {
           totalQueries,
@@ -255,8 +300,15 @@ export const model = {
       arguments: z.object({}),
       execute: async (_args, context) => {
         const g = context.globalArgs;
-        const result = await opnsenseApi("/core/tunables/get", g) as Record<string, unknown>;
-        const items = ((result.sysctl as Record<string, unknown>)?.item ?? {}) as Record<string, Record<string, string>>;
+        const result = await opnsenseApi("/core/tunables/get", g) as Record<
+          string,
+          unknown
+        >;
+        const items =
+          ((result.sysctl as Record<string, unknown>)?.item ?? {}) as Record<
+            string,
+            Record<string, string>
+          >;
 
         const handles = [];
         for (const [_id, item] of Object.entries(items)) {
@@ -273,7 +325,9 @@ export const model = {
           handles.push(handle);
         }
 
-        context.logger.info("Found {count} tunables", { count: handles.length });
+        context.logger.info("Found {count} tunables", {
+          count: handles.length,
+        });
         return { dataHandles: handles };
       },
     },
@@ -282,19 +336,35 @@ export const model = {
       description:
         "Set a system tunable value. Requires tunable name, value, and description. Calls reconfigure after saving.",
       arguments: z.object({
-        tunable: z.string().describe("Sysctl name (e.g., net.inet.tcp.recvspace)"),
+        tunable: z.string().describe(
+          "Sysctl name (e.g., net.inet.tcp.recvspace)",
+        ),
         value: z.string().describe("New value to set"),
-        description: z.string().optional().describe("Description (defaults to existing)"),
+        description: z.string().optional().describe(
+          "Description (defaults to existing)",
+        ),
       }),
       execute: async (args, context) => {
         const g = context.globalArgs;
 
         // Find the tunable's ID from the full list
-        const result = await opnsenseApi("/core/tunables/get", g) as Record<string, unknown>;
-        const items = ((result.sysctl as Record<string, unknown>)?.item ?? {}) as Record<string, Record<string, string>>;
+        const result = await opnsenseApi("/core/tunables/get", g) as Record<
+          string,
+          unknown
+        >;
+        const items =
+          ((result.sysctl as Record<string, unknown>)?.item ?? {}) as Record<
+            string,
+            Record<string, string>
+          >;
 
         let targetId = "";
-        let existing = { tunable: args.tunable, descr: "", type: "w", value: "" };
+        let existing = {
+          tunable: args.tunable,
+          descr: "",
+          type: "w",
+          value: "",
+        };
         for (const [id, item] of Object.entries(items)) {
           if (item.tunable === args.tunable) {
             targetId = id;
@@ -304,7 +374,9 @@ export const model = {
         }
 
         if (!targetId) {
-          throw new Error(`Tunable "${args.tunable}" not found in OPNsense configuration`);
+          throw new Error(
+            `Tunable "${args.tunable}" not found in OPNsense configuration`,
+          );
         }
 
         // OPNsense setItem requires the full sysctl object
@@ -317,27 +389,40 @@ export const model = {
           },
         };
 
-        const setResult = await opnsenseApi(`/core/tunables/setItem/${targetId}`, g, {
-          method: "POST",
-          body: payload,
-        }) as Record<string, string>;
+        const setResult = await opnsenseApi(
+          `/core/tunables/setItem/${targetId}`,
+          g,
+          {
+            method: "POST",
+            body: payload,
+          },
+        ) as Record<string, string>;
 
         if (setResult.result !== "saved") {
-          throw new Error(`Failed to set tunable: ${JSON.stringify(setResult)}`);
+          throw new Error(
+            `Failed to set tunable: ${JSON.stringify(setResult)}`,
+          );
         }
 
         // Apply the change
-        const reconfigResult = await opnsenseApi("/core/tunables/reconfigure", g, {
-          method: "POST",
-          body: {},
-        }) as Record<string, string>;
+        const reconfigResult = await opnsenseApi(
+          "/core/tunables/reconfigure",
+          g,
+          {
+            method: "POST",
+            body: {},
+          },
+        ) as Record<string, string>;
 
-        context.logger.info("Set {tunable} = {value} (was: {old}) — reconfigure: {status}", {
-          tunable: args.tunable,
-          value: args.value,
-          old: existing.value || existing.default_value,
-          status: reconfigResult.status ?? "unknown",
-        });
+        context.logger.info(
+          "Set {tunable} = {value} (was: {old}) — reconfigure: {status}",
+          {
+            tunable: args.tunable,
+            value: args.value,
+            old: existing.value || existing.default_value,
+            status: reconfigResult.status ?? "unknown",
+          },
+        );
 
         const data = {
           tunable: args.tunable,
@@ -347,7 +432,11 @@ export const model = {
           type: existing.type || "w",
         };
 
-        const handle = await context.writeResource("tunable", sanitizeId(args.tunable), data);
+        const handle = await context.writeResource(
+          "tunable",
+          sanitizeId(args.tunable),
+          data,
+        );
         return { dataHandles: [handle] };
       },
     },

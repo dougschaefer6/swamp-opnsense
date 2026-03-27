@@ -57,8 +57,10 @@ export async function opnsenseApi(
   const method = options?.method ?? "GET";
   const args = [
     "-s",
-    "-u", `${globalArgs.apiKey}:${globalArgs.apiSecret}`,
-    "-H", "Accept: application/json",
+    "-u",
+    `${globalArgs.apiKey}:${globalArgs.apiSecret}`,
+    "-H",
+    "Accept: application/json",
   ];
 
   // Only send Content-Type on POST — GET with Content-Type causes OPNsense to
@@ -77,7 +79,11 @@ export async function opnsenseApi(
 
   args.push(url.toString());
 
-  const cmd = new Deno.Command("curl", { args, stdout: "piped", stderr: "piped" });
+  const cmd = new Deno.Command("curl", {
+    args,
+    stdout: "piped",
+    stderr: "piped",
+  });
   const output = await cmd.output();
 
   if (!output.success) {
