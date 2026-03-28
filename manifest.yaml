@@ -1,0 +1,15 @@
+manifestVersion: 1
+name: "@dougschaefer/opnsense-firewall"
+version: "2026.03.27.2"
+description: "OPNsense firewall monitoring and tuning via REST API — system status, interface traffic stats, Unbound DNS analytics, and sysctl tunable management. Handles self-signed certificates, designed for multi-tenant MSP deployments."
+repository: https://github.com/dougschaefer6/swamp-opnsense
+labels:
+  - opnsense
+  - firewall
+  - networking
+  - dns
+  - freebsd
+  - msp
+models:
+  - opnsense/_client.ts
+  - opnsense/firewall.ts
