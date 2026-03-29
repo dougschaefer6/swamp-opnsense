@@ -1,4 +1,4 @@
-import { z } from "npm:zod@4";
+import { z } from "npm:zod@4.3.6";
 
 /**
  * Shared OPNsense API client and schemas for extension models.
