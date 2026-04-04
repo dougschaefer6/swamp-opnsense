@@ -288,7 +288,8 @@ export const model = {
     },
 
     reboot: {
-      description: "Reboot the OPNsense appliance. Network will drop for 60-90 seconds.",
+      description:
+        "Reboot the OPNsense appliance. Network will drop for 60-90 seconds.",
       arguments: z.object({}),
       execute: async (_args, context) => {
         const g = context.globalArgs;
@@ -354,7 +355,9 @@ export const model = {
       description:
         "Start, stop, or restart a service by name (e.g., 'unbound', 'dnsmasq', 'tailscale').",
       arguments: z.object({
-        service: z.string().describe("Service name (e.g., 'unbound', 'tailscale')"),
+        service: z.string().describe(
+          "Service name (e.g., 'unbound', 'tailscale')",
+        ),
         action: z.enum(["start", "stop", "restart", "status"]).describe(
           "Action to perform",
         ),
@@ -447,7 +450,8 @@ export const model = {
     },
 
     "firmware-install": {
-      description: "Install an OPNsense plugin by package name (e.g., 'os-tailscale').",
+      description:
+        "Install an OPNsense plugin by package name (e.g., 'os-tailscale').",
       arguments: z.object({
         package: z.string().describe(
           "Plugin package name (e.g., 'os-tailscale', 'os-realtek-re-kmod')",
@@ -555,7 +559,8 @@ export const model = {
     },
 
     "gateway-status": {
-      description: "Get gateway health with latency, packet loss, and dpinger metrics.",
+      description:
+        "Get gateway health with latency, packet loss, and dpinger metrics.",
       arguments: z.object({}),
       execute: async (_args, context) => {
         const g = context.globalArgs;
@@ -600,7 +605,8 @@ export const model = {
     },
 
     "arp-table": {
-      description: "List ARP table entries with MAC addresses, hostnames, and manufacturers.",
+      description:
+        "List ARP table entries with MAC addresses, hostnames, and manufacturers.",
       arguments: z.object({}),
       execute: async (_args, context) => {
         const g = context.globalArgs;
@@ -942,11 +948,14 @@ export const model = {
           body: {},
         });
 
-        context.logger.info("Added tunable {tunable} = {value} (type: {type})", {
-          tunable: args.tunable,
-          value: args.value,
-          type: args.type,
-        });
+        context.logger.info(
+          "Added tunable {tunable} = {value} (type: {type})",
+          {
+            tunable: args.tunable,
+            value: args.value,
+            type: args.type,
+          },
+        );
 
         const data = {
           tunable: args.tunable,
@@ -1093,7 +1102,9 @@ export const model = {
           opnsenseApi("/wireguard/service/status", g).catch(() => ({
             status: "unknown",
           })) as Promise<Record<string, unknown>>,
-          opnsenseApi("/wireguard/service/show", g).catch(() => ({})) as Promise<
+          opnsenseApi("/wireguard/service/show", g).catch(
+            () => ({}),
+          ) as Promise<
             Record<string, unknown>
           >,
         ]);
