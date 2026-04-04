@@ -1,5 +1,5 @@
 .swamp/
 vaults/
-models/
+/models/
 workflows/
 *.secret
