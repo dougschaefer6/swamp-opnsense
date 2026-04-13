@@ -20,10 +20,10 @@ import { z } from "npm:zod@4.3.6";
  */
 
 export const OPNsenseGlobalArgsSchema = z.object({
-  apiKey: z.string().describe(
+  apiKey: z.string().meta({ sensitive: true }).describe(
     "OPNsense API key. Use: ${{ vault.get(opnsense, api-key) }}",
   ),
-  apiSecret: z.string().describe(
+  apiSecret: z.string().meta({ sensitive: true }).describe(
     "OPNsense API secret. Use: ${{ vault.get(opnsense, api-secret) }}",
   ),
   baseUrl: z
