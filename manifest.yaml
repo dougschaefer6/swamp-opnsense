@@ -1,6 +1,6 @@
 manifestVersion: 1
 name: "@dougschaefer/opnsense-firewall"
-version: "2026.04.27.1"
+version: "2026.04.27.2"
 description: "Full OPNsense management via REST API — system status, interfaces, DNS, tunables, services, firmware/plugins, firewall states, DHCP leases, ARP table, Tailscale, WireGuard, and raw API passthrough. Replaces MCP server."
 repository: https://github.com/dougschaefer6/swamp-opnsense
 additionalFiles:
@@ -13,5 +13,4 @@ labels:
   - dns
   - freebsd
 models:
-  - opnsense/_client.ts
   - opnsense/firewall.ts
