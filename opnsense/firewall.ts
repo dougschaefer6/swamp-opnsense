@@ -19,7 +19,7 @@ import {
  */
 export const model = {
   type: "@dougschaefer/opnsense-firewall",
-  version: "2026.05.27.1",
+  version: "2026.05.27.2",
   globalArguments: OPNsenseGlobalArgsSchema,
   resources: {
     status: {
@@ -1316,7 +1316,7 @@ export const model = {
             handles.push(
               await context.writeResource(
                 "dhcp-lease",
-                sanitizeId(leaseData.address || leaseData.mac),
+                sanitizeId(`dhcp-${leaseData.address || leaseData.mac}`),
                 leaseData,
               ),
             );
@@ -1343,7 +1343,7 @@ export const model = {
           handles.push(
             await context.writeResource(
               "arp-entry",
-              sanitizeId(arpData.ip),
+              sanitizeId(`arp-${arpData.ip}-${arpData.mac}`),
               arpData,
             ),
           );
