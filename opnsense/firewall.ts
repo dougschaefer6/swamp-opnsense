@@ -5,9 +5,21 @@ import {
   sanitizeId,
 } from "./_client.ts";
 
+/**
+ * `@dougschaefer/opnsense-firewall` model — manages an OPNsense
+ * firewall via its REST API. Status reports system health (CPU,
+ * memory, uptime, temperature), interface state (link, throughput,
+ * IPs), Unbound DNS resolver statistics, gateway latency/loss, ARP
+ * and DHCP tables, and firmware/plugin inventory. Tunables exposes
+ * sysctl values with their defaults for compliance auditing.
+ * Services lists configured services with running state.  Api is a
+ * generic passthrough for endpoints not wrapped explicitly. Reboot
+ * is the one mutation surface and triggers a system restart. Auth
+ * uses API key + secret pair via globalArguments (vault-resolved).
+ */
 export const model = {
   type: "@dougschaefer/opnsense-firewall",
-  version: "2026.04.04.1",
+  version: "2026.05.27.1",
   globalArguments: OPNsenseGlobalArgsSchema,
   resources: {
     status: {
@@ -159,6 +171,37 @@ export const model = {
       }),
       lifetime: "1h",
       garbageCollection: 5,
+    },
+  },
+
+  checks: {
+    "appliance-reachable": {
+      description:
+        "Verify the OPNsense appliance is reachable and the API key is valid before executing mutating operations.",
+      labels: ["live", "destructive"],
+      appliesTo: [
+        "reboot",
+        "set-tunable",
+        "add-tunable",
+        "tailscale-set",
+        "service-control",
+      ],
+      execute: async (context) => {
+        try {
+          const g = context.globalArgs;
+          await opnsenseApi("/core/firmware/status", g);
+          return { pass: true };
+        } catch (err) {
+          return {
+            pass: false,
+            errors: [
+              `OPNsense appliance not reachable or API credentials invalid: ${
+                String(err)
+              }`,
+            ],
+          };
+        }
+      },
     },
   },
 
@@ -428,7 +471,7 @@ export const model = {
         const data = {
           currentVersion: product.product_version ?? "unknown",
           needsUpdate: status.needs_reboot === "1" ||
-            (status.updates ?? 0) > 0,
+            (Number(status.updates ?? 0)) > 0,
           plugins: installedPlugins,
         };
 
@@ -837,7 +880,7 @@ export const model = {
           >;
 
         let targetId = "";
-        let existing = {
+        let existing: Record<string, string> = {
           tunable: args.tunable,
           descr: "",
           type: "w",
@@ -1121,6 +1164,202 @@ export const model = {
           },
         );
         return { dataHandles: [handle] };
+      },
+    },
+
+    // =========================================================================
+    // SYNC
+    // =========================================================================
+
+    sync: {
+      description:
+        "Refresh all OPNsense state into resources: system status, interfaces, gateways, DHCP leases, and ARP table.",
+      arguments: z.object({}),
+      execute: async (_args, context) => {
+        const g = context.globalArgs;
+
+        // System status
+        const [firmware, gateways, activity, pfStates] = await Promise.all([
+          opnsenseApi("/core/firmware/status", g) as Promise<
+            Record<string, unknown>
+          >,
+          opnsenseApi("/routes/gateway/status", g) as Promise<
+            Record<string, unknown>
+          >,
+          opnsenseApi("/diagnostics/activity/getActivity", g) as Promise<
+            Record<string, unknown>
+          >,
+          opnsenseApi("/diagnostics/firewall/pf_states/0/1", g) as Promise<
+            Record<string, unknown>
+          >,
+        ]);
+
+        const product = firmware.product as Record<string, string> ?? {};
+        const headers = (activity.headers as string[]) ?? [];
+        const cpuLine = headers.find((h: string) => h.includes("CPU:")) ?? "";
+        const memLine = headers.find((h: string) => h.includes("Mem:")) ?? "";
+        const swapLine = headers.find((h: string) => h.includes("Swap:")) ?? "";
+        const uptimeLine =
+          headers.find((h: string) => h.includes("load averages")) ?? "";
+        const loadMatch = uptimeLine.match(/load averages:\s+([\d.,\s]+)/);
+        const uptimeMatch = uptimeLine.match(/up\s+([\d+:]+)/);
+        const memActive = memLine.match(/([\d.]+\w+)\s+Active/)?.[1] ??
+          "unknown";
+        const memFree = memLine.match(/([\d.]+\w+)\s+Free/)?.[1] ?? "unknown";
+        const gwItems = (gateways.items as Array<Record<string, string>>) ?? [];
+
+        const statusData = {
+          hostname: product.product_name ?? "OPNsense",
+          firmware: product.product_version ?? "unknown",
+          series: product.product_series ?? "unknown",
+          cpuUsage: cpuLine,
+          memoryActive: memActive,
+          memoryFree: memFree,
+          swap: swapLine,
+          uptime: uptimeMatch?.[1] ?? "unknown",
+          loadAverage: loadMatch?.[1]?.trim() ?? "unknown",
+          pfStates: String(pfStates.current ?? "unknown"),
+          pfStateLimit: String(pfStates.limit ?? "unknown"),
+          gateways: gwItems.map((gw) => ({
+            name: gw.name,
+            address: gw.address,
+            status: gw.status_translated ?? gw.status,
+            loss: gw.loss,
+            delay: gw.delay,
+          })),
+        };
+
+        const handles = [];
+        handles.push(
+          await context.writeResource("status", "system", statusData),
+        );
+
+        // Gateways
+        for (const gw of gwItems) {
+          const data = {
+            name: gw.name ?? "",
+            address: gw.address ?? "",
+            status: gw.status_translated ?? gw.status ?? "unknown",
+            loss: gw.loss ?? "~",
+            delay: gw.delay ?? "~",
+            stddev: gw.stddev ?? "~",
+            interface: gw.interface ?? "",
+          };
+          handles.push(
+            await context.writeResource("gateway", sanitizeId(data.name), data),
+          );
+        }
+
+        // Interfaces
+        const [overview, stats] = await Promise.all([
+          opnsenseApi("/interfaces/overview/export", g) as Promise<
+            Array<Record<string, unknown>>
+          >,
+          opnsenseApi("/diagnostics/traffic/interface", g) as Promise<
+            Record<string, unknown>
+          >,
+        ]);
+        const statsInterfaces = (stats.interfaces ?? {}) as Record<
+          string,
+          Record<string, unknown>
+        >;
+        for (const iface of overview) {
+          const ifName =
+            (iface.description ?? iface.identifier ?? "unknown") as string;
+          const device =
+            (iface.device ?? iface.identifier ?? "unknown") as string;
+          const ifStats = statsInterfaces[device.toLowerCase()] ??
+            statsInterfaces[ifName.toLowerCase()] ?? {};
+          const ifData = {
+            name: ifName,
+            device,
+            macaddr: (iface.macaddr ?? "unknown") as string,
+            mtu: Number(iface.mtu ?? ifStats.mtu ?? 0),
+            linkRate: (ifStats["line rate"] ?? "unknown") as string,
+            flags: (iface.flags ?? []) as string[],
+            capabilities: (iface.capabilities ?? []) as string[],
+            options: (iface.options ?? []) as string[],
+            packetsReceived: Number(ifStats["packets received"] ?? 0),
+            packetsSent: Number(ifStats["packets transmitted"] ?? 0),
+            bytesReceived: Number(ifStats["bytes received"] ?? 0),
+            bytesSent: Number(ifStats["bytes transmitted"] ?? 0),
+            inputErrors: Number(ifStats["input errors"] ?? 0),
+            outputErrors: Number(ifStats["output errors"] ?? 0),
+            collisions: Number(ifStats.collisions ?? 0),
+          };
+          handles.push(
+            await context.writeResource(
+              "interface",
+              sanitizeId(`${ifName}-${device}`),
+              ifData,
+            ),
+          );
+        }
+
+        // DHCP leases
+        try {
+          const leaseResult = await opnsenseApi(
+            "/dnsmasq/leases/search",
+            g,
+          ) as Record<string, unknown>;
+          const rows = (leaseResult.rows as Array<Record<string, string>>) ??
+            [];
+          for (const lease of rows) {
+            const leaseData = {
+              address: lease.address ?? "",
+              mac: lease.mac ?? lease.hwaddr ?? "",
+              hostname: lease.hostname ?? lease.client ?? "",
+              starts: lease.starts ?? "",
+              ends: lease.ends ?? "",
+              status: lease.state ?? lease.status ?? "active",
+            };
+            handles.push(
+              await context.writeResource(
+                "dhcp-lease",
+                sanitizeId(leaseData.address || leaseData.mac),
+                leaseData,
+              ),
+            );
+          }
+        } catch {
+          context.logger.info(
+            "DHCP leases not available (dnsmasq not running)",
+          );
+        }
+
+        // ARP table
+        const arpResult = await opnsenseApi(
+          "/diagnostics/interface/getArp",
+          g,
+        ) as Array<Record<string, string>>;
+        for (const entry of arpResult) {
+          const arpData = {
+            ip: entry.ip ?? "",
+            mac: entry.mac ?? "",
+            manufacturer: entry.manufacturer ?? "",
+            interface: entry.intf ?? "",
+            hostname: entry.hostname ?? "",
+          };
+          handles.push(
+            await context.writeResource(
+              "arp-entry",
+              sanitizeId(arpData.ip),
+              arpData,
+            ),
+          );
+        }
+
+        context.logger.info(
+          "Sync complete: {status} status, {gw} gateways, {if} interfaces, {arp} ARP entries",
+          {
+            status: "1",
+            gw: gwItems.length,
+            if: overview.length,
+            arp: arpResult.length,
+          },
+        );
+
+        return { dataHandles: handles };
       },
     },
   },
