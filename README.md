@@ -158,7 +158,7 @@ Tunables use the `/api/core/tunables/*` endpoints, and the `setItem` call requir
 
 ## Testing
 
-Validated against a production OPNsense 26.1.5 appliance (Ryzen 5 NUC, dual Realtek NICs) in an ASEI lab environment. All 20 methods tested for correct API path resolution, response parsing, and resource output.
+Validated against a production OPNsense 26.1.5 appliance (Ryzen 5 NUC, dual Realtek NICs) in a production lab environment. All 20 methods tested for correct API path resolution, response parsing, and resource output.
 
 ## License
 

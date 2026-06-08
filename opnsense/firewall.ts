@@ -19,7 +19,7 @@ import {
  */
 export const model = {
   type: "@dougschaefer/opnsense-firewall",
-  version: "2026.05.27.2",
+  version: "2026.06.08.1",
   globalArguments: OPNsenseGlobalArgsSchema,
   resources: {
     status: {
